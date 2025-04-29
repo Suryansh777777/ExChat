@@ -2,14 +2,14 @@ import { FlatList, RefreshControl, Text, View } from "react-native";
 import { Link } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { IconSymbol } from "@/components/IconSymbol";
-import { ChatRoom, Message } from "@/utils/types";
+import { ChatRoom } from "@/utils/types";
 import { appwriteConfig, db } from "@/utils/Appwrite";
 import { Query } from "react-native-appwrite";
-import { chatRooms } from "@/utils/test-data";
 
 export default function Index() {
-  // const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
@@ -18,6 +18,9 @@ export default function Index() {
       console.log(error);
     }
   };
+  useEffect(() => {
+    fetchChatRooms();
+  }, []);
 
   const fetchChatRooms = async () => {
     try {
@@ -26,8 +29,7 @@ export default function Index() {
         appwriteConfig.col.chatrooms,
         [Query.limit(100)]
       );
-      // setChatRooms(documents as ChatRoom[]);
-      // setChatRooms(documents as ChatRoom[]);
+      setChatRooms(documents as ChatRoom[]);
       // console.log(JSON.stringify(documents, null, 2), total);
     } catch (error) {
       console.log(error);
@@ -39,7 +41,7 @@ export default function Index() {
   return (
     <FlatList
       data={chatRooms}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item) => item.$id}
       refreshControl={
         <RefreshControl refreshing={false} onRefresh={handleRefresh} />
       }
@@ -48,7 +50,7 @@ export default function Index() {
           href={{
             pathname: "/[chat]",
             params: {
-              chat: item.id,
+              chat: item.$id,
             },
           }}
         >
@@ -67,7 +69,6 @@ export default function Index() {
             <ItemTitleAndDescription
               title={item.title}
               description={item.description}
-              isPrivate={item.isPrivate}
             />
             <IconSymbol name="chevron.right" color="#666666" />
           </View>
@@ -83,30 +84,30 @@ export default function Index() {
 }
 function ItemTitle({
   title,
-  isPrivate,
-}: {
+}: // isPrivate,
+{
   title: string;
-  isPrivate: boolean;
+  // isPrivate: boolean;
 }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
       <Text style={{ fontSize: 17, color: "#FFFFFF" }}>{title}</Text>
-      {isPrivate && <IconSymbol name="lock.fill" size={20} color="#666666" />}
+      {/* {isPrivate && <IconSymbol name="lock.fill" size={20} color="#666666" />} */}
     </View>
   );
 }
 function ItemTitleAndDescription({
   title,
   description,
-  isPrivate,
-}: {
+}: // isPrivate,
+{
   title: string;
   description: string;
-  isPrivate: boolean;
+  // isPrivate: boolean;
 }) {
   return (
     <View style={{ gap: 4 }}>
-      <ItemTitle title={title} isPrivate={isPrivate} />
+      <ItemTitle title={title} />
       <Text style={{ fontSize: 13, color: "#666666" }}>{description}</Text>
     </View>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { Link, Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -27,10 +27,67 @@ export default function Chat() {
   const { user } = useUser();
   if (!chatId) return <Text>Chat not found</Text>;
 
+  const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageContent, setMessageContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const headerHeight = useHeaderHeight();
+
+  const handleFirstLoad = async () => {
+    try {
+      await getMessages();
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    handleFirstLoad();
+  }, [chatId]);
+
+  useEffect(() => {
+    const channel = `databases.${appwriteConfig.db}.collections.${appwriteConfig.col.chatrooms}.documents.${chatId}`;
+    const unsubscribe = client.subscribe(channel, () => {
+      console.log("chat room updated");
+      getMessages();
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const getChatRoom = async () => {
+    try {
+      const data = await db.getDocument(
+        appwriteConfig.db,
+        appwriteConfig.col.chatrooms,
+        chatId as string
+      );
+
+      setChatRoom(document as unknown as ChatRoom);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const getMessages = async () => {
+    try {
+      const { documents, total } = await db.listDocuments(
+        appwriteConfig.db,
+        appwriteConfig.col.messages,
+        [
+          Query.equal("chatRoomId", chatId as string),
+          Query.limit(100),
+          Query.orderAsc("$createdAt"),
+        ]
+      );
+      setMessages(documents as Message[]);
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   const sendMessage = async () => {
     if (messageContent.trim() === "") return;
@@ -85,11 +142,64 @@ export default function Chat() {
         >
           <LegendList
             data={messages}
-            renderItem={({ item }) => (
-              <View>
-                <Text>{item.content}</Text>
-              </View>
-            )}
+            renderItem={({ item }) => {
+              const isSender = item.senderId === user?.id;
+              return (
+                <View
+                  style={{
+                    padding: 10,
+                    borderRadius: 10,
+                    flexDirection: "row",
+                    alignItems: "flex-end",
+                    gap: 6,
+                    maxWidth: "80%",
+                    alignSelf: isSender ? "flex-end" : "flex-start",
+                  }}
+                >
+                  {!isSender && (
+                    <Image
+                      source={{ uri: item.senderPhoto }}
+                      style={{ width: 30, height: 30, borderRadius: 15 }}
+                    />
+                  )}
+                  <View
+                    style={{
+                      backgroundColor: isSender ? "#007AFF" : "#161616",
+                      flex: 1,
+                      padding: 10,
+                      borderRadius: 10,
+                    }}
+                  >
+                    <Text style={{ fontWeight: "500", marginBottom: 4 }}>
+                      {item.senderName}
+                    </Text>
+                    <Text>{item.content}</Text>
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        textAlign: "right",
+                      }}
+                    >
+                      {new Date(item.$createdAt!).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }}
+            keyExtractor={(item) => item?.$id ?? "unknown"}
+            contentContainerStyle={{ padding: 10 }}
+            recycleItems={true}
+            initialScrollIndex={messages.length - 1}
+            alignItemsAtEnd // Aligns to the end of the screen, so if there's only a few items there will be enough padding at the top to make them appear to be at the bottom.
+            maintainScrollAtEnd // prop will check if you are already scrolled to the bottom when data changes, and if so it keeps you scrolled to the bottom.
+            maintainScrollAtEndThreshold={0.5} // prop will check if you are already scrolled to the bottom when data changes, and if so it keeps you scrolled to the bottom.
+            maintainVisibleContentPosition //Automatically adjust item positions when items are added/removed/resized above the viewport so that there is no shift in the visible content.
+            estimatedItemSize={100} // estimated height of the item
+            // getEstimatedItemSize={(info) => { // use if items are different known sizes
+            //   console.log("info", info);
           />
 
           {/* Input */}

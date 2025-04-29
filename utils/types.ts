@@ -1,10 +1,12 @@
 interface ChatRoom {
-  id: string;
+  $id: string;
   title: string;
   description: string;
-  isPrivate: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  $createdAt: string;
+  $updatedAt: string;
+  $permissions: any[];
+  $collectionId: string;
+  $databaseId: string;
 }
 // Here $ is for appwrite because of the $ in the collection name
 interface Message {
