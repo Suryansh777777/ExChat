@@ -1,12 +1,13 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Text";
 import React from "react";
+import { useLocalSearchParams } from "expo-router";
 
-const Chat = () => {
+export default function Chat() {
+  const { chat: chatId } = useLocalSearchParams();
   return (
     <View>
-      <Text>Chat</Text>
+      <Text>{chatId}</Text>
     </View>
   );
-};
-
-export default Chat;
+}

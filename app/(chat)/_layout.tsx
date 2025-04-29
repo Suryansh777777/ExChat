@@ -40,14 +40,14 @@ export default function RootChatLayout() {
           ),
         }}
       />
-      <Stack.Screen name="Profile" options={{ presentation: "modal" }} />
+      <Stack.Screen name="profile" options={{ presentation: "modal" }} />
 
       {/* Set title to empty string to prevent showing [chat] in the header while chat room title is being fetched */}
       <Stack.Screen name="[chat]" options={{ headerTitle: "" }} />
-      <Stack.Screen
+      {/* <Stack.Screen
         name="settings/[chat]"
         options={{ presentation: "modal", headerTitle: "Room Settings" }}
-      />
+      /> */}
     </Stack>
   );
 }
