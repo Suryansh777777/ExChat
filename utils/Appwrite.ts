@@ -2,7 +2,10 @@ import { Client, Databases } from "react-native-appwrite";
 
 if (
   !process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT ||
-  !process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID
+  !process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID ||
+  !process.env.EXPO_PUBLIC_APPWRITE_DATABASE ||
+  !process.env.EXPO_PUBLIC_APPWRITE_COLLECTION_CHATROOMS ||
+  !process.env.EXPO_PUBLIC_APPWRITE_COLLECTION_MESSAGES
 ) {
   throw new Error("Appwrite Environment Variables not set");
 }

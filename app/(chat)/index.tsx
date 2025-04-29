@@ -1,16 +1,41 @@
 import { FlatList, RefreshControl, Text, View } from "react-native";
-import { chatRooms } from "@/utils/test-data";
 import { Link } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { IconSymbol } from "@/components/IconSymbol";
+import { ChatRoom, Message } from "@/utils/types";
+import { appwriteConfig, db } from "@/utils/Appwrite";
+import { Query } from "react-native-appwrite";
+import { chatRooms } from "@/utils/test-data";
 
 export default function Index() {
-  const [refreshing, setRefreshing] = React.useState(false);
+  // const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setRefreshing(false);
+    try {
+      setRefreshing(true);
+      await fetchChatRooms();
+    } catch (error) {
+      console.log(error);
+    }
   };
+
+  const fetchChatRooms = async () => {
+    try {
+      const { documents, total } = await db.listDocuments(
+        appwriteConfig.db,
+        appwriteConfig.col.chatrooms,
+        [Query.limit(100)]
+      );
+      // setChatRooms(documents as ChatRoom[]);
+      // setChatRooms(documents as ChatRoom[]);
+      // console.log(JSON.stringify(documents, null, 2), total);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  // useEffect(() => {
+  //   fetchChatRooms();
+  // }, []);
   return (
     <FlatList
       data={chatRooms}
