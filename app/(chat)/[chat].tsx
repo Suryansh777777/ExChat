@@ -1,5 +1,3 @@
-import React, { useEffect, useState } from "react";
-
 import { Link, Stack, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
@@ -19,86 +17,102 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { IconSymbol } from "@/components/IconSymbol";
 import { useUser } from "@clerk/clerk-expo";
-import { FlatList } from "react-native";
-import { Primary, Secondary } from "@/utils/colors";
 
-export default function Chat() {
-  const { chat: chatId } = useLocalSearchParams();
+import { Secondary, Primary, Red } from "@/utils/colors";
+import { useEffect, useRef, useState } from "react";
+
+export default function ChatRoomScreen() {
+  const { chat: chatRoomId } = useLocalSearchParams();
   const { user } = useUser();
-  if (!chatId) return <Text>Chat not found</Text>;
 
+  if (!chatRoomId) {
+    return <Text>We couldn't find this chat room </Text>;
+  }
+
+  const [messageContent, setMessageContent] = useState("");
   const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [messageContent, setMessageContent] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const headerHeight = useHeaderHeight();
-
-  const handleFirstLoad = async () => {
-    try {
-      await getMessages();
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const textInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     handleFirstLoad();
-  }, [chatId]);
+  }, []);
 
   useEffect(() => {
-    const channel = `databases.${appwriteConfig.db}.collections.${appwriteConfig.col.chatrooms}.documents.${chatId}`;
+    if (!isLoading) {
+      setTimeout(() => {
+        textInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    const channel = `dbs.${appwriteConfig.db}.collections.${appwriteConfig.col.chatrooms}.documents.${chatRoomId}`;
     const unsubscribe = client.subscribe(channel, () => {
       console.log("chat room updated");
       getMessages();
     });
+
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [chatRoomId]);
 
-  const getChatRoom = async () => {
+  async function handleFirstLoad() {
     try {
-      const data = await db.getDocument(
-        appwriteConfig.db,
-        appwriteConfig.col.chatrooms,
-        chatId as string
-      );
-
-      setChatRoom(document as unknown as ChatRoom);
+      await getChatRoom();
+      await getMessages();
     } catch (error) {
-      console.log(error);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }
 
-  const getMessages = async () => {
+  async function getChatRoom() {
+    const document = await db.getDocument(
+      appwriteConfig.db,
+      appwriteConfig.col.chatrooms,
+      chatRoomId as string
+    );
+
+    setChatRoom(document as unknown as ChatRoom);
+  }
+
+  async function getMessages() {
     try {
-      const { documents, total } = await db.listDocuments(
+      const { documents } = await db.listDocuments(
         appwriteConfig.db,
         appwriteConfig.col.messages,
         [
-          Query.equal("chatRoomId", chatId as string),
+          Query.equal("chatRoomId", chatRoomId),
           Query.limit(100),
-          Query.orderAsc("$createdAt"),
+          Query.orderDesc("$createdAt"),
         ]
       );
-      setMessages(documents as Message[]);
-    } catch (error) {
-      console.log(error);
-    }
-  };
 
-  const sendMessage = async () => {
+      documents.reverse();
+
+      setMessages(documents as unknown as Message[]);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function handleSendMessage() {
     if (messageContent.trim() === "") return;
+
+    const message = {
+      content: messageContent,
+      senderId: user?.id!,
+      senderName: user?.fullName ?? "Anonymous",
+      senderPhoto: user?.imageUrl ?? "",
+      chatRoomId: chatRoomId as string,
+    };
+
     try {
-      const message = {
-        content: messageContent,
-        senderId: user?.id!,
-        senderName: user?.fullName ?? "Anonymous",
-        senderPhoto: user?.imageUrl ?? "",
-        chatRoomId: chatId as string,
-      };
       await db.createDocument(
         appwriteConfig.db,
         appwriteConfig.col.messages,
@@ -107,18 +121,18 @@ export default function Chat() {
       );
       setMessageContent("");
 
+      console.log("updating chat room", chatRoomId);
+
       await db.updateDocument(
         appwriteConfig.db,
         appwriteConfig.col.chatrooms,
-        chatId as string,
-        {
-          $updatedAt: new Date().toISOString(),
-        }
+        chatRoomId as string,
+        { $updatedAt: new Date().toISOString() }
       );
     } catch (error) {
-      console.log(error);
+      console.error(error);
     }
-  };
+  }
 
   if (isLoading) {
     return (
@@ -127,17 +141,28 @@ export default function Chat() {
       </View>
     );
   }
+
   return (
     <>
       <Stack.Screen
         options={{
-          title: "Chat",
+          headerTitle: chatRoom?.title,
+          headerRight: () => (
+            <Link
+              href={{
+                pathname: "/settings/[chat]",
+                params: { chat: chatRoomId as string },
+              }}
+            >
+              <IconSymbol name="gearshape" size={24} color={Primary} />
+            </Link>
+          ),
         }}
       />
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior="padding"
+          behavior={"padding"}
           keyboardVerticalOffset={headerHeight}
         >
           <LegendList
@@ -193,16 +218,12 @@ export default function Chat() {
             contentContainerStyle={{ padding: 10 }}
             recycleItems={true}
             initialScrollIndex={messages.length - 1}
-            alignItemsAtEnd // Aligns to the end of the screen, so if there's only a few items there will be enough padding at the top to make them appear to be at the bottom.
-            maintainScrollAtEnd // prop will check if you are already scrolled to the bottom when data changes, and if so it keeps you scrolled to the bottom.
-            maintainScrollAtEndThreshold={0.5} // prop will check if you are already scrolled to the bottom when data changes, and if so it keeps you scrolled to the bottom.
-            maintainVisibleContentPosition //Automatically adjust item positions when items are added/removed/resized above the viewport so that there is no shift in the visible content.
-            estimatedItemSize={100} // estimated height of the item
-            // getEstimatedItemSize={(info) => { // use if items are different known sizes
-            //   console.log("info", info);
+            alignItemsAtEnd
+            maintainScrollAtEnd
+            maintainScrollAtEndThreshold={0.5}
+            maintainVisibleContentPosition
+            estimatedItemSize={100}
           />
-
-          {/* Input */}
           <View
             style={{
               borderWidth: 1,
@@ -215,13 +236,14 @@ export default function Chat() {
             }}
           >
             <TextInput
+              ref={textInputRef}
               placeholder="Type a message"
               style={{
                 minHeight: 40,
                 color: "white",
-                flexShrink: 1, // prevent pushing the send button out of the screen
-                flexGrow: 1, // allow the text input to grow keeping the send button to the right
-                padding: 12,
+                flexShrink: 1,
+                flexGrow: 1,
+                padding: 10,
               }}
               placeholderTextColor={"gray"}
               multiline
@@ -229,18 +251,18 @@ export default function Chat() {
               onChangeText={setMessageContent}
             />
             <Pressable
-              disabled={messageContent === ""}
               style={{
                 width: 50,
                 height: 50,
                 alignItems: "center",
                 justifyContent: "center",
               }}
-              onPress={sendMessage}
+              onPress={handleSendMessage}
             >
               <IconSymbol
                 name="paperplane"
-                color={messageContent === "" ? Primary : "gray"}
+                size={24}
+                color={messageContent ? Primary : "gray"}
               />
             </Pressable>
           </View>
